@@ -1,0 +1,36 @@
+# agent-ops pipeline configuration
+name = "Weekly AI Automation Brief"
+schedule = "0 8 * * MON"          # cron: every Monday 08:00 (scheduler timezone)
+timezone = "UTC"
+max_items_per_topic = 3
+min_relevance = 0.5               # 0..1, items below this are dropped by the analyst
+lookback_days = 0                 # 0 = no date filter (keeps the bundled sample feeds working); e.g. 7 for weekly
+
+[[topics]]
+name = "AI agents"
+keywords = ["agent", "agents", "tool use", "tool calling", "multi-agent", "autonomous", "orchestration"]
+
+[[topics]]
+name = "Workflow automation"
+keywords = ["n8n", "zapier", "workflow", "automation", "integration", "webhook", "rpa"]
+
+[[topics]]
+name = "LLM engineering"
+keywords = ["rag", "retrieval", "evaluation", "evals", "prompt", "embedding", "fine-tuning", "structured output"]
+
+# Feeds can be http(s) URLs or local paths (relative to this file).
+[[feeds]]
+name = "Automation Digest"
+url = "../data/feeds/automation_digest.xml"
+
+[[feeds]]
+name = "ML Engineering Notes"
+url = "../data/feeds/ml_engineering.xml"
+
+[[feeds]]
+name = "Tech Business Wire"
+url = "../data/feeds/tech_wire.xml"
+
+[output]
+markdown_dir = "../runs"
+slack_webhook_env = "SLACK_WEBHOOK_URL"   # read from this env var; unset = no Slack post

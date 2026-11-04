@@ -1,0 +1,117 @@
+{
+  "name": "Weekly AI Brief (agent-ops)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "cronExpression", "expression": "0 8 * * 1" }
+          ]
+        }
+      },
+      "id": "9c2d4a10-7b1e-4f0a-a1d2-000000000001",
+      "name": "Every Monday 08:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "command": "agent-ops --config /app/config/pipeline.toml run --json"
+      },
+      "id": "9c2d4a10-7b1e-4f0a-a1d2-000000000002",
+      "name": "Run agent-ops pipeline",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const out = $input.first().json;\nlet run;\ntry { run = JSON.parse(out.stdout); } catch (e) { run = { status: 'failed', error: out.stderr || String(e) }; }\nconst usage = run.usage || {};\nconst analyse = (run.steps || []).find(s => s.name === 'analyse') || { detail: {} };\nreturn [{ json: {\n  status: run.status,\n  run_id: run.run_id,\n  error: run.error || null,\n  items: analyse.detail.kept || 0,\n  cost_usd: usage.cost_usd || 0,\n  brief_path: (run.outputs || {}).markdown || null\n} }];"
+      },
+      "id": "9c2d4a10-7b1e-4f0a-a1d2-000000000003",
+      "name": "Parse run record",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "ok",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "ok",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9c2d4a10-7b1e-4f0a-a1d2-000000000004",
+      "name": "Run succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "fileSelector": "={{ $json.brief_path }}",
+        "options": {}
+      },
+      "id": "9c2d4a10-7b1e-4f0a-a1d2-000000000005",
+      "name": "Read brief.md",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [960, 200]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": { "__rl": true, "value": "#ai-weekly", "mode": "name" },
+        "text": "=:newspaper: Weekly AI brief is ready ({{ $('Parse run record').item.json.items }} items, est. ${{ $('Parse run record').item.json.cost_usd }}). Run {{ $('Parse run record').item.json.run_id }}",
+        "otherOptions": {}
+      },
+      "id": "9c2d4a10-7b1e-4f0a-a1d2-000000000006",
+      "name": "Post to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [1200, 200],
+      "credentials": { "slackApi": { "id": "REPLACE_ME", "name": "Slack account" } }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": { "__rl": true, "value": "#automation-alerts", "mode": "name" },
+        "text": "=:warning: agent-ops weekly brief failed: {{ $json.error }}",
+        "otherOptions": {}
+      },
+      "id": "9c2d4a10-7b1e-4f0a-a1d2-000000000007",
+      "name": "Alert on failure",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [960, 420],
+      "credentials": { "slackApi": { "id": "REPLACE_ME", "name": "Slack account" } }
+    }
+  ],
+  "connections": {
+    "Every Monday 08:00": { "main": [[{ "node": "Run agent-ops pipeline", "type": "main", "index": 0 }]] },
+    "Run agent-ops pipeline": { "main": [[{ "node": "Parse run record", "type": "main", "index": 0 }]] },
+    "Parse run record": { "main": [[{ "node": "Run succeeded?", "type": "main", "index": 0 }]] },
+    "Run succeeded?": {
+      "main": [
+        [{ "node": "Read brief.md", "type": "main", "index": 0 }],
+        [{ "node": "Alert on failure", "type": "main", "index": 0 }]
+      ]
+    },
+    "Read brief.md": { "main": [[{ "node": "Post to Slack", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "active": false,
+  "tags": [{ "name": "ai-automation" }, { "name": "reporting" }]
+}
